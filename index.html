@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=PT+Sans+Narrow:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@800&display=swap" rel="stylesheet">    
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <header id="header">
+            <div id="chamber">
+                <svg id="chamber-logo" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 43.56 47.766"><path d="M61.152-112.329c-5.804-1.227-10.905-4.67-14.054-9.486-5.757-8.804-4.451-21.422 2.948-28.498l1.107-1.058-1.205 1.878c-1.788 2.786-2.798 5.57-3.29 9.063-1.008 7.168 1.015 13.833 5.742 18.916 7.037 7.566 20.21 9.308 29.919 3.958l1.19-.656-1.058.984c-2.54 2.363-6.243 4.168-10.241 4.992-2.78.573-8.122.528-11.058-.093m1.283-7.259c-7.265-2.15-11.368-8.684-10.528-16.768.355-3.429 1.567-6.093 3.843-8.45l1.485-1.538-.651 1.19c-1.421 2.6-1.908 4.658-1.911 8.07-.003 2.78.087 3.438.725 5.292 1.678 4.872 5.428 8.36 10.368 9.641 3.702.96 8.311.538 11.628-1.065l1.088-.527-.926.826c-1.748 1.558-3.282 2.467-5.41 3.208-2.832.986-6.63 1.034-9.711.121m15.767-25.85c-.428-.448-1.492-1.285-2.365-1.859-4.606-3.028-11.057-3.253-16.405-.573l-1.323.663.65-.702c1.192-1.288 4.088-3.035 6.23-3.759 4.185-1.415 9.68-.885 13.211 1.274 1.486.908 3.59 2.61 3.59 2.903 0 .191-.426.64-2.03 2.14l-.78.729zm4.568-5.695c-4.074-3.794-9.192-5.688-15.532-5.747-4.788-.044-8.974.954-12.668 3.022l-1.488.832.658-.71c.955-1.034 3.822-2.859 5.957-3.793 8.902-3.893 20.332-2.151 26.31 4.01.645.666 1.122 1.25 1.058 1.3s-.711.635-1.439 1.302l-1.323 1.212z" style="fill:#FFF" transform="translate(-43.51 159.6)"/></svg>
+                <div id="chamber-text">
+                    <h2>New Canaan</h2>
+                    <h3>Chamber of Commerce</h3>
+                </div>
+            </div>
+            <div>
+                <div id="search-box">
+                    <input type="text" placeholder="Search.." id="search">
+                    <div id="search-button" class="search-icon">
+                        <svg class="search-svg" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </header>
+        <main id="body-container">
+            <!-- left sidebar -->
+            <aside id="sidebar">
+                <!-- all the geoman tool stuff -->
+                <div id="tool-config">
+                    <div id="tool-config-top" class="left-panel-top">
+                        <h3 id="config-title" class="left-panel-title"></h3>
+                        <button id="config-close" onclick="deactivateActiveTool();">
+                            <div class="button-icon">&#x2715;</div>
+                        </button>
+                    </div>
+                    <div id="config-common" class="config-section hidden">
+                        <div class="form-group">
+                            <label for="shape-name">Name</label>
+                            <input type="text" id="shape-name" placeholder="Enter plot name...">
+                        </div>
+                    </div>
+                    <div id="config-marker" class="config-section hidden"></div>
+                    <div id="config-rectangle" class="config-section hidden">
+                        <div class="form-group">
+                            <label for="rect-label-size">Label Size</label>
+                            <select id="rect-label-size">
+                                <option value="none">None</option>
+                                <option value="small">Small</option>
+                                <option value="medium">Medium</option>
+                                <option value="large">Large</option>
+                            </select>
+                        </div>
+                        <div id="rect-label-controls" class="sub-config hidden">
+                            <div class="form-group">
+                                <label for="rect-label-dir">Label Direction</label>
+                                <select id="rect-label-dir">
+                                    <option value="center">Center</option>
+                                    <option value="right">Right</option>
+                                    <option value="bottom">Down</option>
+                                    <option value="left">Left</option>
+                                    <option value="top">Up</option>
+                                </select>                                
+                            </div>
+                            <div class="form-group">
+                                <label for="rect-label-fill">Label Fill</label>
+                                <select id="rect-label-fill">
+                                    <option value="enabled">Enabled</option>
+                                    <option value="disabled">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="rect-mode">Draw Mode</label>
+                            <select id="rect-mode">
+                                <option value="free">Free Draw</option>
+                                <option value="fixed">Fixed Size</option>
+                                <option value="stack">Stack Along Line</option>
+                            </select>
+                        </div>
+                        <div id="rect-fixed-inputs" class="sub-config hidden">
+                            <div class="form-group">
+                                <label for="rect-width">Width (ft)</label>
+                                <input type="number" id="rect-width" placeholder="e.g. 20">
+                            </div>
+                            <div class="form-group">
+                                <label for="rect-height">Height (ft)</label>
+                                <input type="number" id="rect-height" placeholder="e.g. 10">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="config-polygon" class="config-section hidden"></div>
+                    <p id="config-helper-text"></p>
+                </div>
+                <div id="layer-control">
+                    <div class="left-panel-top">
+                        <h3 class="left-panel-title">Layers</h3>
+                        <button id="layer-add">
+                            <div class="button-icon">&#xFF0B;</div>
+                        </button>
+                        <div id="add-layer-dropdown" class="layer-dropdown hidden">
+                            <div class="dropdown-item" id="opt-new-layer">Create New Layer</div>
+                            <div class="dropdown-item" id="opt-import-business">Import Business GeoJSON</div>
+                            <div class="dropdown-item" id="opt-import-drawing">Import Drawing GeoJSON</div>
+                        </div>
+                        <input type="file" id="file-import-business" accept=".geojson,.json" class="hidden">
+                        <input type="file" id="file-import-drawing" accept=".geojson,.json" class="hidden">
+                    </div>
+                    <div id="layer-panel">
+                        <!-- <div class="layer" style="--layer-color:#2a63aa">
+                            <div class="layer-subsection">
+                                <div class="layer-icon"></div>
+                                <div class="layer-name">Businesses</div>
+                            </div>
+                            <div class="layer-subsection">
+                                <button class="layer-button">
+                                    <div class="button-icon">&hellip;</div>
+                                </button>
+                            </div>
+                        </div> -->
+                    </div>
+                </div>
+            </aside>
+
+            <!-- center -->
+            <div id="map-container">
+                <div id="map"></div>
+            </div>
+
+            <!-- slide out info panel -->
+            <aside id="info-panel">
+                <div id="info-view-mode">
+                    <div class="panel-header">
+                        <div class="panel-header-top">
+                            <span class="category-badge">category</span>
+                            <div class="panel-buttons">
+                                <button id="modify"><div class="button-icon">&hellip;</div></button>
+                                <button id="close" onclick="closeInfoPanel()"><div class="button-icon">&#x2715;</div></button>
+                            </div>
+
+                        </div>
+                        <h1>name</h1>
+                        <h2>addr</h2>
+                    </div>
+                    <div class="panel-body"></div>
+                    <button id="start-edit-btn" class="panel-action-btn">Edit Feature Attributes</button>
+                    <div class="notes-section">
+                        <textarea class="notes-placeholder"
+                            placeholder="Add notes..."></textarea>
+                    </div>
+                </div>
+                <div id="info-edit-mode" class="hidden">
+                    <div class="panel-header">
+                        <div class="panel-header-top">
+                            <h1 style="margin-bottom: 0px !important;">Modify Data</h1>
+                            <button id="toggle-edit-mode-btn" class="category-badge" style="cursor:pointer; border:none; color:white;">ADVANCED</button>
+                        </div>
+                    </div>
+                    <div class="panel-body" id="edit-form-body-container">
+                        <div id="edit-basic-mode" class="edit-mode-view">
+                            <div class="form-group"><label>Name</label><input type="text" id="basic-Name" data-key="Name"></div>
+                            <div class="form-group"><label>Address</label><input type="text" id="basic-Address" data-key="Address"></div>
+                            <div class="form-group"><label>Category</label><input type="text" id="basic-Category" data-key="Category"></div>
+
+                            <div class="form-group optional-field hidden" id="basic-Phone-group"><label>Phone</label><input type="text" id="basic-Phone" data-key="Phone"></div>
+                            <div class="form-group optional-field hidden" id="basic-Website-group"><label>Website</label><input type="text" id="basic-Website" data-key="Website"></div>
+                            <div class="form-group optional-field hidden" id="basic-Instagram-group"><label>Instagram</label><input type="text" id="basic-Instagram" data-key="Instagram"></div>
+                            <div class="form-group optional-field hidden" id="basic-Dimensions-group"><label>Dimensions</label><input type="text" id="basic-Dimensions" data-key="Dimensions"></div>
+
+                            <hr id="label-hr" style="border: 0; border-top: 1px solid var(--intense); margin: 16px 0;">
+                            
+                            <div class="form-group" id="basic-LabelSize-group">
+                                <label>Label Size</label>
+                                <select id="basic-LabelSize">
+                                    <option value="none">None</option>
+                                    <option value="small">Small</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="large">Large</option>
+                                </select>
+                            </div>
+                            <div id="basic-label-controls" class="sub-config hidden">
+                                <div class="form-group">
+                                    <label>Label Direction</label>
+                                    <select id="basic-labelDir">
+                                        <option value="center">Center</option>
+                                        <option value="right">Right</option>
+                                        <option value="bottom">Down</option>
+                                        <option value="left">Left</option>
+                                        <option value="top">Up</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Label Fill</label>
+                                    <select id="basic-labelBackground">
+                                        <option value="enabled">Enabled</option>
+                                        <option value="disabled">Disabled</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <hr style="border: 0; border-top: 1px solid var(--intense); margin: 16px 0;">
+                            
+                            <div class="form-group" style="margin-top: 6px;">
+                                <select id="basic-add-field">
+                                    <option value="" disabled selected>Add Field...</option>
+                                    <option value="Phone">Phone</option>
+                                    <option value="Website">Website</option>
+                                    <option value="Instagram">Instagram</option>
+                                    <option value="Dimensions">Dimensions</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="edit-advanced-mode" class="edit-mode-view hidden">
+                            <div id="edit-form-advanced-fields"></div>
+                        </div>
+                    </div>
+                    <div class="notes-section">
+                        <button id="save-edit-btn" class="panel-action-btn primary-action">Save Changes</button>
+                        <button id="cancel-edit-btn" class="panel-action-btn">Cancel</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+    <!-- <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js"></script> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/leaflet-edgebuffer@1.0.7/src/leaflet.edgebuffer.min.js"></script> -->
+    <script src="https://unpkg.com/tldts/dist/index.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet.pattern@0.1.0/dist/leaflet.pattern.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

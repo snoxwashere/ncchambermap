@@ -31,7 +31,7 @@ L.Marker.include({
 var map = L.map('map', {
     rotate: true, bearing: 10, rotateControl: false,
     crs: customCRS,
-    minZoom: 0,
+    minZoom: 3,
     maxZoom: 10,
     autoPanPadding: [0, 0],
 });

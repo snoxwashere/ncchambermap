@@ -31,8 +31,12 @@ L.Marker.include({
 var map = L.map('map', {
     rotate: true, bearing: 10, rotateControl: false,
     crs: customCRS,
-    minZoom: 3,
+    minZoom: 6,
     maxZoom: 10,
+    // maxBounds: [
+    //     [41.15865422796046, -73.52978700130929], 
+    //     [41.159501876187804, -73.53413260380269]
+    // ],
     autoPanPadding: [0, 0],
 });
 
@@ -43,7 +47,6 @@ L.tileLayer('https://hostingdata3.tighebond.com/arcgis/rest/services/NewCanaanCT
 }).addTo(map);
 
 map.setView([41.14686914854269, -73.49342001509295], 7);
-
 
 //layer controls
 let mapLayers = [];

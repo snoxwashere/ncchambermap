@@ -797,7 +797,7 @@ document.getElementById('cancel-edit-btn').addEventListener('click', () => {
 
 document.getElementById('toggle-edit-mode-btn').addEventListener('click', (e) => {
     isEditAdvancedMode = !isEditAdvancedMode;
-    e.target.textContent = isEditAdvancedMode ? 'BASIC' : 'ADVANCED';
+    e.target.textContent = isEditAdvancedMode ? 'ENTER BASIC MODE' : 'ENTER ADVANCED MODE';
     if (isEditAdvancedMode) {
         document.getElementById('edit-basic-mode').classList.add('hidden');
         document.getElementById('edit-advanced-mode').classList.remove('hidden');
@@ -1077,8 +1077,6 @@ function getColoredMarkerIcon(color, tooltip=false) {
 
 
 
-
-
 //sidebar stuff
 const config = {
     panel : document.getElementById('tool-config'),
@@ -1093,14 +1091,28 @@ const config = {
 
 const helperTextLookup = {
     'Marker' : 'Click anywhere on the map to drop a point marker to label a specific location.',
-    'Rectangle' : 'Click and drag on the map to draw a box, or use the options below to set a specific size.',
+    'Rectangle' : 'Use the draw mode selector to change from free draw to a fixed size. Draw many rectangles at once with the stack along line mode.',
     'Polygon' : 'Click on the map to start drawing a custom boundary shape. Click your starting point again to finish.',
     'Edit' : 'Click on a shape to show its corners, then drag them to tweak or reshape the layout.',
     'Drag' : 'Click and hold any shape on the map to slide it to a new location.',
     'Removal' : 'Click on any shape or marker on the map to permanently delete it.',
     'Rotate' : 'Click and drag the rotation handles around a shape to spin it to the correct angle.',
-    'Select' : 'Click on a shape to view its properties.'
+    'Select' : 'Click on a shape to view its properties. From there, you can edit its attributes in either basic or advanced mode. Click on any of the tools in the lefthand toolbar to edit the map. Use the layer controls to manage and save your drawings. Features you create will automatically go to the selected layer.'
 }
+
+let nothingActive = false;
+function setNothingActive(newVal) {
+    const selButton = document.querySelector('.custom-icon-free-select').parentElement.parentElement;
+    if (newVal !== nothingActive) {
+        if (newVal === true) {
+            selButton.classList.add('custom-active');
+        } else {
+            selButton.classList.remove('custom-active');
+        }
+    }
+    nothingActive = newVal;
+}
+
 
 function hideAllSidebarElements() {
     [config.close, config.common, config.marker, config.rectangle, config.polygon].forEach(el => {
@@ -1108,9 +1120,42 @@ function hideAllSidebarElements() {
     });
     config.title.textContent = 'Free Select';
     config.helperText.textContent = helperTextLookup['Select'];
+    setNothingActive(true);
 }
 
 setTimeout(() => {hideAllSidebarElements();}, 10);
+
+////free select mode
+map.pm.Toolbar.createCustomControl({
+    name: 'freeSelect',
+    block: 'custom',
+    title: 'Free Select',
+    className: 'custom-icon-free-select',
+    toggle: true,
+    disableOtherButtons: true,
+    disabledByOtherButtons: true,
+    afterClick: () => {
+        // Clicking the tool simply triggers your function
+        console.log("wow");
+    }
+    
+});
+
+map.pm.Toolbar.changeControlOrder([
+    "freeSelect"
+]);
+
+
+const configTitleLookup = {
+    'Marker' : 'Place Markers',
+    'Rectangle' : 'Create Rectangles',
+    'Polygon' : 'Create Polygons',
+    'Edit' : 'Edit Vertices',
+    'Drag' : 'Drag & Move',
+    'Removal' : 'Erase Features',
+    'Rotate' : 'Free Rotate',
+    'Select' : 'Free Select'
+}
 
 
 function updateSidebarUI(modeStr, isShapeDraw = true) {
@@ -1129,7 +1174,7 @@ function updateSidebarUI(modeStr, isShapeDraw = true) {
 
     //start displaying things again
     config.panel.classList.remove('hidden');
-    config.title.textContent = `${modeStr} Mode`;
+    config.title.textContent = configTitleLookup[modeStr];
 
     if (isShapeDraw) { //is draw tool
         config.common.classList.remove('hidden'); //name field
@@ -1144,6 +1189,7 @@ function updateSidebarUI(modeStr, isShapeDraw = true) {
 
     }
     config.helperText.textContent = helperTextLookup[modeStr] ?? 'qeqow';
+    setNothingActive(modeStr === 'Select');
 }
 
 
@@ -2025,4 +2071,3 @@ searchInput.addEventListener('input', () => {
         return name.includes(query) || address.includes(query) || category.includes(query);
     })
 });
-

@@ -2262,7 +2262,7 @@ function setCustomLabelProps(properties, angleDegrees, dir, size, fill) {
 //fu geoman
 function standardizeRectangleVertices(points) {
     if (points.length !== 4) {
-        alert("wooooo");
+        alert("Error: Rectangle has fewer than 4 points (likely width / height equals 0). Use the delete tool to remove.");
         return points;
     }
 
@@ -2372,6 +2372,8 @@ map.on('pm:create', (e) => {
     //     layer.bindTooltip(layer.feature.properties.Name, {direction: 'top'});
     // }
     bindShapeEvents(layer, layer.feature);
+    layer.setStyle({fillOpacity: selectedOpacity});
+    openInfoPanel(layer.feature.properties, layer);
 });
 
 

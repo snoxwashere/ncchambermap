@@ -2251,6 +2251,9 @@ function setCustomLabelProps(properties, angleDegrees, dir, size, fill) {
     if (dir !== 'center') {
         properties.labelOriginNum = targetVertex;
         properties.AdjustX = (flipped) ? 50 : -50;
+    } else {
+        properties.labelOriginNum = null;
+        properties.AdjustX = null;
     }
     properties.LabelRotation = angle;
     properties.LabelSize = getLabelFontSize(size);
@@ -2397,6 +2400,7 @@ function deactivateActiveTool() {
         toggleExtendMode(false);
         hideAllSidebarElements();
     }
+    //
 }
 
 window.addEventListener('keydown', function(event) {

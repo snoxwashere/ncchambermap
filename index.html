@@ -39,7 +39,7 @@
             <!-- left sidebar -->
             <aside id="sidebar">
                 <!-- all the geoman tool stuff -->
-                <div id="tool-config">
+                <div id="tool-config" class="sidebar-section">
                     <div id="tool-config-top" class="left-panel-top">
                         <h3 id="config-title" class="left-panel-title"></h3>
                         <button id="config-close" onclick="deactivateActiveTool();">
@@ -47,26 +47,24 @@
                         </button>
                     </div>
                     <div id="config-common" class="config-section hidden">
-                        <div class="form-group">
+                        <!-- <div class="form-group">
                             <label for="shape-name">Name</label>
                             <input type="text" id="shape-name" placeholder="Enter plot name...">
-                        </div>
-                    </div>
-                    <div id="config-marker" class="config-section hidden"></div>
-                    <div id="config-rectangle" class="config-section hidden">
+                        </div> -->
                         <div class="form-group">
-                            <label for="rect-label-size">Label Size</label>
-                            <select id="rect-label-size">
+                            <label for="common-label-size">Label Size</label>
+                            <select id="common-label-size">
                                 <option value="none">None</option>
+                                <option value="xsmall">Extra Small</option>
                                 <option value="small">Small</option>
                                 <option value="medium">Medium</option>
                                 <option value="large">Large</option>
                             </select>
                         </div>
-                        <div id="rect-label-controls" class="sub-config hidden">
-                            <div class="form-group">
-                                <label for="rect-label-dir">Label Direction</label>
-                                <select id="rect-label-dir">
+                        <div id="common-label-controls" class="sub-config hidden">
+                            <div class="form-group" id="label-dir-group">
+                                <label for="common-label-dir">Label Direction</label>
+                                <select id="common-label-dir">
                                     <option value="center">Center</option>
                                     <option value="right">Right</option>
                                     <option value="bottom">Down</option>
@@ -75,13 +73,16 @@
                                 </select>                                
                             </div>
                             <div class="form-group">
-                                <label for="rect-label-fill">Label Fill</label>
-                                <select id="rect-label-fill">
+                                <label for="common-label-fill">Label Fill</label>
+                                <select id="common-label-fill">
                                     <option value="enabled">Enabled</option>
                                     <option value="disabled">Disabled</option>
                                 </select>
                             </div>
                         </div>
+                    </div>
+                    <div id="config-marker" class="config-section hidden"></div>
+                    <div id="config-rectangle" class="config-section hidden">
                         <div class="form-group">
                             <label for="rect-mode">Draw Mode</label>
                             <select id="rect-mode">
@@ -91,20 +92,26 @@
                             </select>
                         </div>
                         <div id="rect-fixed-inputs" class="sub-config hidden">
-                            <div class="form-group">
+                            <div class="form-group" id="rect-width-group">
                                 <label for="rect-width">Width (ft)</label>
-                                <input type="number" id="rect-width" placeholder="e.g. 20">
+                                <input type="number" id="rect-width" placeholder="e.g. 20" value="10">
                             </div>
                             <div class="form-group">
                                 <label for="rect-height">Height (ft)</label>
-                                <input type="number" id="rect-height" placeholder="e.g. 10">
+                                <input type="number" id="rect-height" placeholder="e.g. 10" value="10">
                             </div>
+                        </div>
+                    </div>
+                    <div id="config-extend" class="config-section hidden">
+                        <div class="form-group">
+                            <label for="extend-depth">Depth (ft)</label>
+                            <input type="number" id="extend-depth" placeholder="e.g. 10" value="10">
                         </div>
                     </div>
                     <div id="config-polygon" class="config-section hidden"></div>
                     <p id="config-helper-text"></p>
                 </div>
-                <div id="layer-control">
+                <div id="layer-control" class="sidebar-section">
                     <div class="left-panel-top">
                         <h3 class="left-panel-title">Layers</h3>
                         <button id="layer-add">
@@ -185,6 +192,7 @@
                                 <label>Label Size</label>
                                 <select id="basic-LabelSize">
                                     <option value="none">None</option>
+                                    <option value="xsmall">Extra Small</option>
                                     <option value="small">Small</option>
                                     <option value="medium">Medium</option>
                                     <option value="large">Large</option>

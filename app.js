@@ -95,13 +95,10 @@ function selectLayer(id) {
 
     if (activeLayer) {
         //changing drawing colors
-        map.pm.setPathOptions({
-            color: activeLayer.color,
-            fillColor: activeLayer.color,
-            fillOpacity: unselectedOpacity
-        });
         customShapeStyling.color = activeLayer.color;
         customShapeStyling.fillColor = activeLayer.color;
+        map.pm.setPathOptions(customShapeStyling);
+        
         needUpdateGhost = true;
         map.pm.setGlobalOptions({
             templineStyle: {
@@ -163,7 +160,7 @@ function renderLayers() {
 
         layerEl.innerHTML = `
             <div class="layer-subsection">
-                <div class="layer-icon"></div>
+                <input type="color" class="layer-icon" value="${lyr.color}">
                 <div class="layer-name">${lyr.name}</div>
             </div>
             <div class="layer-subsection">
@@ -178,6 +175,24 @@ function renderLayers() {
                 </div>
             </div>
         `;
+
+        //input trigger
+        const colorInput = layerEl.querySelector('.layer-icon');
+        colorInput.addEventListener('input', (e) => {
+            lyr.color = e.target.value;
+            layerEl.style.setProperty('--layer-color', lyr.color);
+            
+            // Update map layer style
+            lyr.featureGroup.setStyle({
+                color: lyr.color,
+                fillColor: lyr.color
+            });
+            
+            // Update active drawing options if this layer is currently selected
+            if (selectedLayerID === lyr.id) {
+                selectLayer(lyr.id);
+            }
+        });
 
         //select trigger
         layerEl.addEventListener('click', (e) => {
@@ -260,12 +275,19 @@ function exportLayer(id) {
     geojson.layerName = layer.name;
     geojson.layerColor = layer.color;
 
+    const now = new Date();
+    const month = now.toLocaleString('en-US', {month: 'short'});
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const time = `${month}${day}_${hours}${minutes}`;
+
     //dont ask me about this part
     const blob = new Blob([JSON.stringify(geojson)], {type: "application/json"});
     const url = URL.createObjectURL(blob);
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", url);
-    downloadAnchorNode.setAttribute("download", `${layer.name || "layer"}.geojson`);
+    downloadAnchorNode.setAttribute("download", `${layer.name || "layer"}_${time}.geojson`);
     document.body.appendChild(downloadAnchorNode);
     downloadAnchorNode.click();
     downloadAnchorNode.remove();
@@ -447,9 +469,9 @@ function createLabelMarker(feature, layer) {
     if (!feature || !feature.properties) {return;}
 
     let labelCenter = null;
-    if (feature.properties.labelOriginNum !== null && feature.properties.labelOriginNum !== undefined && typeof layer.getBounds === 'function') {
+    if (feature.properties.labelOriginNum !== null && feature.properties.labelOriginNum !== undefined && typeof layer.getBounds === 'function'  && typeof layer.getLatLngs === 'function') {
         //hack!!!
-        const latlngs = layer.getLatLngs()[0];
+        const latlngs = layer.getLatLngs().flat(Infinity);
         const firstCoord = latlngs[feature.properties.labelOriginNum % latlngs.length];
         const secondCoord = latlngs[(feature.properties.labelOriginNum + 1) % latlngs.length];
         const actualCenter = layer.getBounds().getCenter();
@@ -489,31 +511,63 @@ function createLabelMarker(feature, layer) {
                     </div>
                 </div>
             </div>`,
-        iconSize: [0, 0],
-        iconAnchor: [0, 0]
+        iconSize: null,
+        iconAnchor: null
     });
 
     const marker = L.marker(labelCenter, {
         icon: label,
         interactive: false,
-        keyboard: false
+        keyboard: false,
+        zIndexOffset: 1000
     }).addTo(map);
 
     marker.options.pmIgnore = true;
+    
+    //however we want delete triggers to work when hitting label
+    //crazy workaround
+    marker.parentLayer = layer;
+    const innermostDiv = marker.getElement().querySelector('.map-label-adjust')
+    innermostDiv.style.cursor = 'pointer';
+    //by disabling pointer events, this click function will never trigger
+    innermostDiv.style.pointerEvents = 'none';
+    
+    innermostDiv.addEventListener('click', (e) => {
+        L.DomEvent.stopPropagation(e);
+        //if u can manage to click me
+        if (map.pm.globalRemovalModeEnabled() && marker.parentLayer.options.pmIgnore !== true) {
+            marker.parentLayer.pm.remove();
+        }
+    });
+
     //link to list of all markers and to layer
     layer.labelMarker = marker;
     labelMarkers.push(marker);
 }
 
+//jank time
+//toggling pointer-events on innermost labelmarker div
+map.on('pm:globalremovalmodetoggled', (e) => {
+    labelMarkers.forEach((marker) => {
+        marker.getElement().querySelector('.map-label-adjust').style.pointerEvents
+            = e.enabled ? 'auto' : 'none';
+    });
+})
+
+
+let isCurrentlyHovering = false;
+
 //default event package
 function bindShapeEvents(layer, feature) {
     //hover code
     layer.on('mouseover', () => {
+        isCurrentlyHovering = true;
         if (selectedPolygon !== layer && layer.setStyle) {
             layer.setStyle({fillOpacity: selectedOpacity})
         }
     });
     layer.on('mouseout', () => {
+        isCurrentlyHovering = false;
         if (selectedPolygon !== layer && layer.setStyle) {
             layer.setStyle({fillOpacity: unselectedOpacity})
         }
@@ -531,12 +585,24 @@ function bindShapeEvents(layer, feature) {
 
     //labels!!!
     layer.on('pm:markerdragend', (e) => {
+        const latlngs = layer.getLatLngs().flat(Infinity);
+        if (layer instanceof L.Polygon && latlngs.length === 4 && !layer.isCustomRect) {
+            const standardized = standardizeRectangleVertices(latlngs);
+            layer.setLatLngs(standardized);
+            console.log("goo");
+        }
         if (layer.labelMarker) {
             createLabelMarker(layer.feature, layer);
             updateLabelSize(layer.labelMarker);
         }
     });
     layer.on('pm:dragend', (e) => {
+        const latlngs = layer.getLatLngs().flat(Infinity);
+        if (layer instanceof L.Polygon && latlngs.length === 4 && !layer.isCustomRect) {
+            const standardized = standardizeRectangleVertices(latlngs);
+            layer.setLatLngs(standardized);
+            console.log("goo");
+        }
         if (layer.labelMarker) {
             createLabelMarker(layer.feature, layer);
             updateLabelSize(layer.labelMarker);
@@ -552,6 +618,9 @@ function bindShapeEvents(layer, feature) {
             }
             layer.labelMarker = null;
         }
+        //now actually remove
+        //bc geoman isnt good enough
+        mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(layer)).featureGroup.removeLayer(layer);
     });
 }
 
@@ -1019,9 +1088,6 @@ document.getElementById('save-edit-btn').addEventListener('click', () => {
 
 
 
-
-
-
 //scale indicator
 L.control.scale({
     maxWidth: 120
@@ -1034,6 +1100,8 @@ function metersToFeet(meters) {
 function feetToMeters(feet) {
     return feet/3.280839895;
 }
+
+
 
 ////////drawing controls
 map.pm.addControls({
@@ -1050,6 +1118,36 @@ map.pm.addControls({
     cutPolygon: false,
     removalMode: true
 }); 
+
+const geomanControlLabels = {
+    'leaflet-pm-icon-polygon': 'Polygon',
+    'leaflet-pm-icon-rectangle': 'Rectangle',
+    'leaflet-pm-icon-polyline': 'Line',
+    'leaflet-pm-icon-marker': 'Marker',
+    'leaflet-pm-icon-edit': 'Reshape',
+    'leaflet-pm-icon-drag': 'Move',
+    'leaflet-pm-icon-delete': 'Delete',
+    'leaflet-pm-icon-rotate': 'Rotate',
+    'custom-icon-free-select': 'Select',
+    'custom-icon-extend': 'Mark IFOS'
+};
+
+function applyGeomanDescriptors() {
+    document.querySelectorAll('.button-container .control-icon').forEach(iconEl => {
+        const matchingClass = Object.keys(geomanControlLabels).find(cls => iconEl.classList.contains(cls));
+        
+        if (matchingClass) {
+            const buttonLink = iconEl.closest('a.leaflet-buttons-control-button');
+            if (buttonLink && !buttonLink.hasAttribute('data-label')) {
+                buttonLink.setAttribute('data-label', geomanControlLabels[matchingClass]);
+            }
+        }
+    });
+}
+
+applyGeomanDescriptors()
+setTimeout(() => {applyGeomanDescriptors()}, 100);
+
 
 map.pm.setPathOptions(customShapeStyling);
 map.pm.setGlobalOptions({
@@ -1078,7 +1176,14 @@ function getColoredMarkerIcon(color, tooltip=false) {
     });
 }
 
-
+//will this work
+const customTranslation = {
+  tooltips: {
+    firstVertex: "Click once to place first vertex",
+    finishRect: "Click the opposite corner to finish",
+  },
+};
+map.pm.setLang("customName", customTranslation, "en");
 
 //sidebar stuff
 const config = {
@@ -1089,12 +1194,14 @@ const config = {
     marker : document.getElementById('config-marker'),
     rectangle : document.getElementById('config-rectangle'),
     polygon : document.getElementById('config-polygon'),
+    extend : document.getElementById('config-extend'),
     helperText : document.getElementById('config-helper-text')
 };
 
 const helperTextLookup = {
     'Marker' : 'Click anywhere on the map to drop a point marker to label a specific location.',
-    'Rectangle' : 'Use the draw mode selector to change from free draw to a fixed size. Draw many rectangles at once with the stack along line mode.',
+    'Rectangle' : 'Use the draw mode selector to change from free draw to a fixed size. Draw many rectangles at once with the stack along line mode. Use the select tool to edit the properties of finished shapes.',
+    'Extend' : 'Click in front of a store to create a plot of the specified depth. Use the select tool to edit the properties of finished shapes.',
     'Polygon' : 'Click on the map to start drawing a custom boundary shape. Click your starting point again to finish.',
     'Edit' : 'Click on a shape to show its corners, then drag them to tweak or reshape the layout.',
     'Drag' : 'Click and hold any shape on the map to slide it to a new location.',
@@ -1118,7 +1225,7 @@ function setNothingActive(newVal) {
 
 
 function hideAllSidebarElements() {
-    [config.close, config.common, config.marker, config.rectangle, config.polygon].forEach(el => {
+    [config.close, config.common, config.marker, config.rectangle, config.polygon, config.extend].forEach(el => {
         el.classList.add('hidden');
     });
     config.title.textContent = 'Free Select';
@@ -1138,22 +1245,62 @@ map.pm.Toolbar.createCustomControl({
     disableOtherButtons: true,
     disabledByOtherButtons: true,
     afterClick: () => {
-        // Clicking the tool simply triggers your function
-        console.log("wow");
+        if (isCustomRectModeActive) {
+            map.pm.disableDraw(); //force a disable event
+            resetCustomRectangleModes();
+            hideAllSidebarElements();
+        }
     }
     
 });
 
-map.pm.Toolbar.changeControlOrder([
-    "freeSelect"
-]);
+/////extend mode starter
+let isExtendModeActive = false;
+function toggleExtendMode(enable) {
+    if (enable) {
+        deactivateActiveTool();
+        isExtendModeActive = true;
+        updateSidebarUI('Extend', true);
 
+        enableLayerClick = false;
+        map.getContainer().classList.add('extend-rect-active');
+
+        map.on('mousemove', onExtendRectMouseMove);
+        setTimeout(() => map.on('click', onExtendRectClick), 10);
+    } else {
+        isExtendModeActive = false;
+        cleanupExtendRectMode();
+    }
+}
+
+map.pm.Toolbar.createCustomControl({
+    name: 'extendMode',
+    block: 'draw',
+    title: 'Extend',
+    className: 'custom-icon-extend',
+    toggle: true,
+    disableOtherButtons: true,
+    disabledByOtherButtons: true,
+    onClick: () => {
+        if (!isExtendModeActive) {
+            toggleExtendMode(true);
+        } else {
+            toggleExtendMode(false);
+            hideAllSidebarElements();
+        }
+    }
+});
+
+map.pm.Toolbar.changeControlOrder([
+    "freeSelect", "Marker", "Rectangle", "extendMode"
+]);
 
 const configTitleLookup = {
     'Marker' : 'Place Markers',
     'Rectangle' : 'Create Rectangles',
+    'Extend' : 'Mark IFOS',
     'Polygon' : 'Create Polygons',
-    'Edit' : 'Edit Vertices',
+    'Edit' : 'Reshape Vertices',
     'Drag' : 'Drag & Move',
     'Removal' : 'Erase Features',
     'Rotate' : 'Free Rotate',
@@ -1174,6 +1321,7 @@ function updateSidebarUI(modeStr, isShapeDraw = true) {
 
     //reset rectangle submenu
     document.getElementById('rect-fixed-inputs').classList.add('hidden')
+    document.getElementById('label-dir-group').classList.remove('hidden');
 
     //start displaying things again
     config.panel.classList.remove('hidden');
@@ -1187,6 +1335,9 @@ function updateSidebarUI(modeStr, isShapeDraw = true) {
             config.rectangle.classList.remove('hidden');
         } else if (modeStr === 'Polygon') {
             config.polygon.classList.remove('hidden');
+        } else if (modeStr === 'Extend') {
+            document.getElementById('label-dir-group').classList.add('hidden');
+            config.extend.classList.remove('hidden');
         }
     } else { //is edit tool
 
@@ -1201,6 +1352,7 @@ function resetCustomRectangleModes() {
     isCustomRectModeActive = false;
     cleanupFixedRectMode();
     cleanupStackRectMode();
+    cleanupExtendRectMode();
     document.getElementById('rect-mode').value = 'free';
     setGeomanRectangleActive(false);
 }
@@ -1704,6 +1856,217 @@ function cleanupStackRectMode() {
     enableLayerClick = true;
 }
 
+
+///////extendy code
+
+//pls dont question the math
+function localProject(latlng, centerLat) {
+    const R = 6378137;
+    const y = latlng.lat * (Math.PI / 180) * R;
+    const x = latlng.lng * (Math.PI / 180) * R * Math.cos(centerLat * Math.PI / 180);
+    return {x, y};
+}
+function localUnproject(pt, centerLat) {
+    const R = 6378137;
+    const lat = pt.y / (R * (Math.PI / 180));
+    const lng = pt.x / (R * Math.cos(centerLat * Math.PI / 180) * (Math.PI / 180));
+    return L.latLng(lat, lng);
+}
+//beautiful algebra
+function distToSegmentSquared(p, v, w) {
+    const l2 = (w.x - v.x)*(w.x - v.x) + (w.y - v.y)*(w.y - v.y);
+    if (l2 === 0) return (p.x - v.x)*(p.x - v.x) + (p.y - v.y)*(p.y - v.y);
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const proj = { x: v.x + t * (w.x - v.x), y: v.y + t * (w.y - v.y) };
+    return (p.x - proj.x)*(p.x - proj.x) + (p.y - proj.y)*(p.y - proj.y);
+}
+function pointInPoly(pt, polyPts) {
+    let inside = false;
+    for (let i = 0, j = polyPts.length - 1; i < polyPts.length; j = i++) {
+        let xi = polyPts[i].x, yi = polyPts[i].y;
+        let xj = polyPts[j].x, yj = polyPts[j].y;
+        let intersect = ((yi > pt.y) != (yj > pt.y)) && (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+//important
+function getLabelDirFromNormal(angleDeg) {
+    let a = angleDeg % 360;
+    if (a < -180) {a += 360;}
+    if (a > 180) {a -= 360;}
+
+    if (a > -45 && a <= 45) {return 'right';}
+    if (a > 45 && a <= 135) {return 'top';}
+    if (a > 135 || a <= -135) {return 'left';}
+    if (a > -135 && a <= -45) {return 'bottom';}
+    return 'center';
+}
+
+
+function getExtendRectangle(e_latlng, heightFt) {
+    const heightM = feetToMeters(heightFt);
+    const centerLat = e_latlng.lat;
+    const mousePt = localProject(e_latlng, centerLat);
+    let closestDist = Infinity;
+    let bestEdge = null;
+    let bestPolyPts = null;
+    let bestName = null;
+
+    businessGroup.getLayers().forEach(layer => {
+        if (!(layer instanceof L.Polygon)) {return;}
+        const latlngs = layer.getLatLngs().flat(Infinity);
+        const pts = latlngs.map(ll => localProject(ll, centerLat));
+        for (let i = 0; i < pts.length; i++) {
+            const j = (i + 1) % pts.length;
+            const d2 = distToSegmentSquared(mousePt, pts[i], pts[j]);
+            if (d2 < closestDist) {
+                closestDist = d2;
+                bestEdge = {v: pts[i], w: pts[j]};
+                bestPolyPts = pts;
+                bestName = layer.feature.properties.Name;
+            }
+        }
+    });
+
+    //don't snap if too far away
+    if (closestDist > 100 * 100 || !bestEdge) return null;
+
+    //math again
+    const dx = bestEdge.w.x - bestEdge.v.x;
+    const dy = bestEdge.w.y - bestEdge.v.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+
+    const nx = -dy / len; 
+    const ny = dx / len;
+
+    //test point to see if we need to reverse
+    const midX = (bestEdge.v.x + bestEdge.w.x) / 2;
+    const midY = (bestEdge.v.y + bestEdge.w.y) / 2;
+    const testPt = { x: midX + nx * 1.0, y: midY + ny * 1.0 }; 
+
+    let finalNx = nx, finalNy = ny;
+    if (pointInPoly(testPt, bestPolyPts)) { 
+        //reversing
+        finalNx = -nx;
+        finalNy = -ny;
+    }
+
+    //build shape
+    const c1 = {
+        x: bestEdge.v.x + finalNx * heightM/6,
+        y: bestEdge.v.y + finalNy * heightM/6 
+    };
+    const c2 = {
+        x: bestEdge.w.x + finalNx * heightM/6,
+        y: bestEdge.w.y + finalNy * heightM/6 
+    };
+    const c3 = {
+        x: c2.x + finalNx * heightM,
+        y: c2.y + finalNy * heightM 
+    };
+    const c4 = {
+        x: c1.x + finalNx * heightM,
+        y: c1.y + finalNy * heightM
+    };
+
+    const rectLatLngs = [
+        localUnproject(c1, centerLat), localUnproject(c2, centerLat),
+        localUnproject(c3, centerLat), localUnproject(c4, centerLat)
+    ];
+
+    const normalAngle = Math.atan2(finalNy, finalNx) * (180 / Math.PI);
+    const edgeAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+    const edgeWidthFt = metersToFeet(len);
+
+    return {points: rectLatLngs, normalAngle, edgeAngle, edgeWidthFt, bestName};
+}
+
+let extendGhostLayer = null;
+
+function onExtendRectMouseMove(e) {
+    const heightFt = parseFloat(document.getElementById('extend-depth').value);
+    if (isNaN(heightFt) || heightFt <= 0) {
+        if (extendGhostLayer) {
+            map.removeLayer(extendGhostLayer);
+            extendGhostLayer = null;
+        }
+        return;
+    }
+
+    const rectData = getExtendRectangle(e.latlng, heightFt);
+
+    if (!rectData) {
+        if (extendGhostLayer) {
+            map.removeLayer(extendGhostLayer); 
+            extendGhostLayer = null; 
+        }
+        return;
+    }
+
+    if (!extendGhostLayer) {
+        extendGhostLayer = L.polygon(rectData.points, {
+            ...customShapeStyling, dashArray: '5, 5',
+            fillOpacity: customShapeStyling.fillOpacity * 0.7, interactive: false
+        });
+        extendGhostLayer._pmTempLayer = true;
+        extendGhostLayer.addTo(map);
+    } else {
+        extendGhostLayer.setLatLngs(rectData.points);
+        if (needUpdateGhost) {
+            extendGhostLayer.setStyle({...customShapeStyling, dashArray: '5, 5', fillOpacity: customShapeStyling.fillOpacity * 0.7});
+        }
+    }
+    needUpdateGhost = false;
+}
+
+
+function onExtendRectClick(e) {
+    //yippee!!
+    if (isCurrentlyHovering) {
+        return;
+    }
+
+    const heightFt = parseFloat(document.getElementById('extend-depth').value);
+    if (isNaN(heightFt) || heightFt <= 0) return;
+
+    const rectData = getExtendRectangle(e.latlng, heightFt);
+    if (!rectData) return;
+
+    const finalPoly = L.polygon(rectData.points, customShapeStyling).addTo(map);
+
+    if (finalPoly.pm) {
+        finalPoly.pm.setOptions({pmIgnore: false});
+        finalPoly.pm.enable(); finalPoly.pm.disable();
+    }
+
+    const mapAngle = map.pm.getGlobalOptions().rectangleAngle || 0;
+    //this
+    map.fire('pm:create', {
+        shape: 'Rectangle',
+        layer: finalPoly,
+        angleDegrees: (mapAngle + rectData.edgeAngle + 180), //hopefully works
+        width: rectData.edgeWidthFt.toFixed(1), //for dimensions attr
+        height: heightFt,
+        autoLabelDir: getLabelDirFromNormal(mapAngle + rectData.normalAngle),
+        autoLabel: rectData.bestName
+    });
+}
+
+function cleanupExtendRectMode() {
+    map.off('mousemove', onExtendRectMouseMove);
+    map.off('click', onExtendRectClick);
+    map.getContainer().classList.remove('extend-rect-active');
+    if (extendGhostLayer) {
+        map.removeLayer(extendGhostLayer);
+        extendGhostLayer = null;
+    }
+    enableLayerClick = true;
+    isExtendModeActive = false;
+}
+
+
 //set up entering/exiting and event listeners
 document.getElementById('rect-mode').addEventListener('change', (e) => {
     const val = e.target.value;
@@ -1713,6 +2076,7 @@ document.getElementById('rect-mode').addEventListener('change', (e) => {
     fixedInputs.classList.add('hidden');
     cleanupFixedRectMode();
     cleanupStackRectMode();
+    cleanupExtendRectMode();
 
     if (val === 'fixed') {
         //setup button magic
@@ -1753,9 +2117,9 @@ document.getElementById('rect-mode').addEventListener('change', (e) => {
 });
 
 //don't know where else to put this
-document.getElementById('rect-label-size').addEventListener('change', (e) => {
+document.getElementById('common-label-size').addEventListener('change', (e) => {
     const val = e.target.value;
-    const labelControls = document.getElementById('rect-label-controls');
+    const labelControls = document.getElementById('common-label-controls');
     if (val === 'none') {
         labelControls.classList.add('hidden');
     } else {
@@ -1837,10 +2201,12 @@ function getLabelOriginOffset(value) {
 
 function getLabelFontSize(value) {
     switch (value) {
+        case 'xsmall':
+            return 2;
         case 'small':
-            return 2
+            return 3;
         case 'medium':
-            return 4
+            return 5;
         case 'large':
             return 7;
         default:
@@ -1854,11 +2220,13 @@ function reverseLabelFontSize(num) {
     }
     
     if (num >= 7) {
-        return 'large'
-    } else if (num >= 4) {
-        return 'medium'
-    } else {
+        return 'large';
+    } else if (num >= 5) {
+        return 'medium';
+    } else if (num >= 3) {
         return 'small';
+    } else {
+        return 'xsmall';
     }
 }
 
@@ -1891,12 +2259,55 @@ function setCustomLabelProps(properties, angleDegrees, dir, size, fill) {
 }
 
 
+//fu geoman
+function standardizeRectangleVertices(points) {
+    if (points.length !== 4) {
+        alert("wooooo");
+        return points;
+    }
+
+    const centerLat = points.reduce((sum, p) => sum + p.lat, 0) / 4;
+    const centerLng = points.reduce((sum, p) => sum + p.lng, 0) / 4;
+
+    //make clockwise
+    points.sort((a, b) => {
+        return Math.atan2(a.lng - centerLng, a.lat - centerLat) - 
+               Math.atan2(b.lng - centerLng, b.lat - centerLat);
+    });
+
+    //high lat low lng
+    let topLeftIndex = 0;
+    let minDistance = Infinity;
+    
+    points.forEach((p, i) => {
+        const dist = Math.abs(p.lat - 90) + Math.abs(p.lng - -180); 
+        if (dist < minDistance) {
+            minDistance = dist;
+            topLeftIndex = i;
+        }
+    });
+
+    //rotate
+    const standardized = points.slice(topLeftIndex).concat(points.slice(0, topLeftIndex));
+    return standardized;
+}
+
 
 map.on('pm:create', (e) => {
     const layer = e.layer;
     const shapeType = e.shape;
 
     const currentActiveLayer = mapLayers.find(l => (l.id === selectedLayerID));
+
+    //check if geoman rect
+    const isCustomRect = Boolean(e.width);
+    if (shapeType === 'Rectangle' && !isCustomRect) {
+        const standardized = standardizeRectangleVertices(layer.getLatLngs().flat(Infinity));
+        layer.setLatLngs(standardized);
+        newLatLngs = layer.getLatLngs().flat(Infinity);
+        e.width = metersToFeet(map.distance(newLatLngs[0], newLatLngs[1])).toFixed(1);
+        e.height = metersToFeet(map.distance(newLatLngs[1], newLatLngs[2])).toFixed(1);
+    }
 
     if (currentActiveLayer) {
         currentActiveLayer.featureGroup.addLayer(layer);
@@ -1920,10 +2331,11 @@ map.on('pm:create', (e) => {
     layer.feature = {
         type: 'Feature',
         properties: {
-            Name: document.getElementById('shape-name').value || `Custom ${shapeType}`,
+            Name: e.autoLabel || document.getElementById('shape-name')?.value || `Custom ${shapeType}`,
             Category: currentActiveLayer.name,
-            Address: (closestName) ? `Near ${closestName}` : null,
-            isEditableLabel: true
+            Address: e.autoLabel ? `Near ${e.autoLabel}` : ((closestName) ? `Near ${closestName}` : null),
+            isEditableLabel: true,
+            isCustomRect: isCustomRect
         }
     };
 
@@ -1933,26 +2345,26 @@ map.on('pm:create', (e) => {
         if (e.width && e.height) {
             layer.feature.properties.Dimensions = `${e.width}' x ${e.height}'`;
         }
+    }
+    
+    //create label
+    const labelSize = document.getElementById('common-label-size').value;
+    const labelDir = document.getElementById('common-label-dir').value;
+    const labelFill = document.getElementById('common-label-fill').value;
+    layer.feature.properties.shapeAngle = -(e.angleDegrees ?? 0);
 
-        //create label
-        const rectLabelSize = document.getElementById('rect-label-size').value;
-        const rectLabelDir = document.getElementById('rect-label-dir').value;
-        const rectLabelFill = document.getElementById('rect-label-fill').value;
-        layer.feature.properties.shapeAngle = -(e.angleDegrees ?? 0);
-        
-        if (rectLabelSize !== 'none') {
-            setCustomLabelProps(
-                layer.feature.properties,
-                layer.feature.properties.shapeAngle,
-                rectLabelDir,
-                rectLabelSize,
-                rectLabelFill
-            )
-            layer.feature.properties.Label = layer.feature.properties.Name;
-            createLabelMarker(layer.feature, layer);
-            updateLabelSize(layer.labelMarker);
-        }
-
+    
+    if (labelSize !== 'none') {
+        setCustomLabelProps(
+            layer.feature.properties,
+            layer.feature.properties.shapeAngle,
+            e.autoLabelDir ?? labelDir,
+            labelSize,
+            labelFill
+        )
+        layer.feature.properties.Label = layer.feature.properties.Name;
+        createLabelMarker(layer.feature, layer);
+        updateLabelSize(layer.labelMarker);
     }
 
 
@@ -1960,6 +2372,8 @@ map.on('pm:create', (e) => {
     //     layer.bindTooltip(layer.feature.properties.Name, {direction: 'top'});
     // }
     bindShapeEvents(layer, layer.feature);
+    selectedPolygon = layer;
+    openInfoPanel(layer.feature.properties, layer);
 });
 
 
@@ -1979,9 +2393,19 @@ function deactivateActiveTool() {
         resetCustomRectangleModes(); 
         hideAllSidebarElements();
     }
+    if (isExtendModeActive) {
+        toggleExtendMode(false);
+        hideAllSidebarElements();
+    }
 }
 
-
+window.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        deactivateActiveTool();
+        //have to do this bc keyboards trigger focus-visible
+        document.activeElement?.blur();
+    }
+});
 
 
 
@@ -2070,7 +2494,8 @@ searchInput.addEventListener('input', () => {
         const name = String(properties.Name || '').toLowerCase();
         const address = String(properties.Address || '').toLowerCase();
         const category = String(properties.Category || '').toLowerCase();
+        const label = String(properties.Label || '').toLowerCase().replaceAll("\\n", " ");
 
-        return name.includes(query) || address.includes(query) || category.includes(query);
+        return name.includes(query) || address.includes(query) || category.includes(query) || label.includes(query);
     })
 });

@@ -2372,8 +2372,6 @@ map.on('pm:create', (e) => {
     //     layer.bindTooltip(layer.feature.properties.Name, {direction: 'top'});
     // }
     bindShapeEvents(layer, layer.feature);
-    layer.setStyle({fillOpacity: selectedOpacity});
-    openInfoPanel(layer.feature.properties, layer);
 });
 
 

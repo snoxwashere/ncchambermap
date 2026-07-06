@@ -2503,3 +2503,9 @@ searchInput.addEventListener('input', () => {
         return name.includes(query) || address.includes(query) || category.includes(query) || label.includes(query);
     })
 });
+
+//cool
+window.addEventListener('beforeunload', (e) => {
+    e.preventDefault();
+    e.returnValue = true; 
+});

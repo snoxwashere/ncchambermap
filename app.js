@@ -1144,9 +1144,7 @@ function applyGeomanDescriptors() {
         }
     });
 }
-
-applyGeomanDescriptors()
-setTimeout(() => {applyGeomanDescriptors()}, 100);
+window.addEventListener('load', (event) => {applyGeomanDescriptors();});
 
 
 map.pm.setPathOptions(customShapeStyling);
@@ -2505,7 +2503,8 @@ searchInput.addEventListener('input', () => {
 });
 
 //cool
-window.addEventListener('beforeunload', (e) => {
-    e.preventDefault();
-    e.returnValue = true; 
+window.addEventListener('beforeunload', (event) => {
+    event.preventDefault();
+    console.log("halted");
+    event.returnValue = true; 
 });

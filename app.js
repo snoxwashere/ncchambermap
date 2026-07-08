@@ -46,7 +46,7 @@ L.tileLayer('https://hostingdata3.tighebond.com/arcgis/rest/services/NewCanaanCT
     continuousWorld: true
 }).addTo(map);
 
-map.setView([41.14686914854269, -73.49342001509295], 7);
+map.setView([41.14688986667741, -73.49382549386547], 7);
 
 //layer controls
 let mapLayers = [];
@@ -432,6 +432,12 @@ function importDrawingGeoJSON(geojson) {
     })
     updateLabelSizes();
     selectLayer(newLayerObj.id);
+
+    //special case
+    //if default layer is untouched as we import then delete it
+    if (mapLayers.length === 3 && Object.keys(mapLayers[1].featureGroup._layers).length === 0) {
+        deleteLayer(mapLayers[1].id);
+    }
 }
 
 
@@ -742,6 +748,133 @@ function openInfoPanel(properties, layer) {
     infoPanel.classList.add('open');
 }
 
+//hellip time
+const panelModifyBtn = document.getElementById('panel-modify');
+const panelDropdown = document.getElementById('panel-modify-dropdown');
+
+
+panelModifyBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    //this again
+    document.querySelectorAll('.layer-dropdown').forEach(d => {
+        if (d !== panelDropdown) {
+            d.classList.add('hidden');
+        }
+    });
+    panelDropdown.classList.toggle('hidden');
+
+    if (!panelDropdown.classList.contains('hidden')) {
+        const rect = panelModifyBtn.getBoundingClientRect();
+        panelDropdown.style.top = `${rect.bottom}px`;
+        panelDropdown.style.left = `${rect.right - panelDropdown.offsetWidth}px`;
+
+        //setup fields
+        document.getElementById('panel-promote').classList.remove('hidden');
+
+        const curLayer = mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(selectedPolygon));
+        if (curLayer.featureGroup === businessGroup) {
+            document.getElementById('panel-promote').classList.add('hidden');
+        }
+    }
+});
+
+document.getElementById('panel-share').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!selectedPolygon) {
+        return;
+    }
+    
+    const shareName = selectedPolygon.feature?.properties?.Name;
+    if (shareName) {
+        const outputURL = new URL(window.location.origin + window.location.pathname);
+        outputURL.searchParams.append('share', shareName);
+
+        const dropdownBtn = document.getElementById('panel-share');
+        navigator.clipboard.writeText(outputURL.toString())
+            .then(() => {
+            dropdownBtn.textContent = "Copied!";
+            })
+            .catch(err => {
+            dropdownBtn.textContent = "Failed To Copy";
+        });
+        notesTimeout = setTimeout(() => {
+            dropdownBtn.textContent = "Copy Sharing Link";;
+        }, 1500);
+    }
+});
+
+document.getElementById('panel-move').addEventListener('click', (e) => {
+    e.stopPropagation();
+    panelDropdown.classList.add('hidden');
+    if (!selectedPolygon) {
+        return;
+    }
+
+    const oldLayer = mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(selectedPolygon));
+    const newLayer = mapLayers.find(l => (l.id === selectedLayerID));
+
+    oldLayer.featureGroup.removeLayer(selectedPolygon);
+    newLayer.featureGroup.addLayer(selectedPolygon);
+
+    if (selectedPolygon.setStyle) {
+        selectedPolygon.setStyle({
+            color: newLayer.color,
+            fillColor: newLayer.color,
+            fillOpacity: selectedOpacity
+        });
+    } else if (shapeType === 'Marker' && typeof selectedPolygon.setIcon === 'function') {
+        selectedPolygon.setIcon(getColoredMarkerIcon(newLayer.color, true));
+    }
+    
+    selectedPolygon.options.pmIgnore = false;
+});
+
+document.getElementById('panel-promote').addEventListener('click', (e) => {
+    e.stopPropagation();
+    panelDropdown.classList.add('hidden');
+    if (!selectedPolygon) {
+        return;
+    }
+
+    const oldLayer = mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(selectedPolygon));
+    const newLayer = mapLayers.find(l => (l.featureGroup === businessGroup));
+
+    oldLayer.featureGroup.removeLayer(selectedPolygon);
+    newLayer.featureGroup.addLayer(selectedPolygon);
+
+    if (selectedPolygon.setStyle) {
+        selectedPolygon.setStyle({
+            color: newLayer.color,
+            fillColor: newLayer.color,
+            fillOpacity: selectedOpacity
+        });
+    } else if (shapeType === 'Marker' && typeof selectedPolygon.setIcon === 'function') {
+        selectedPolygon.setIcon(getColoredMarkerIcon(newLayer.color, true));
+    }
+
+    //business specific stuff
+    selectedPolygon.feature.properties.labelBackground = false;
+    if (selectedPolygon.labelMarker) {
+        createLabelMarker(selectedPolygon.feature, selectedPolygon);
+        updateLabelSize(selectedPolygon.labelMarker);
+    }
+    selectedPolygon.options.pmIgnore = true;
+});
+
+
+document.getElementById('panel-delete').addEventListener('click', (e) => {
+    e.stopPropagation();
+    panelDropdown.classList.add('hidden');
+    if (!selectedPolygon) {
+        return;
+    }
+    selectedPolygon.options.pmIgnore = false;
+    selectedPolygon.pm.remove();
+    selectedPolygon = null;
+    closeInfoPanel();
+});
+
+
 
 const svgLookup = {
     'Email' : '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline>',
@@ -786,6 +919,7 @@ function createInfoPanelField(key, value, href = null) {
 function closeInfoPanel() {
     clearSelection();
     infoPanel.classList.remove('open');
+    panelDropdown.classList.add('hidden');
 }
 
 function clearSelection() {
@@ -826,12 +960,15 @@ map.on('click', (e) => {
     if (e.originalEvent.button === 0) {closeInfoPanel();}
 });
 
+
+
 //////////editing version of the panel
 
 const featureAttributeNames = [
     'Name',
     'Address',
     'Category',
+    'Tags',
     'Phone',
     'Website',
     'Instagram',
@@ -927,7 +1064,7 @@ function populateEditFields() {
     initialEditName = props.Name || '';
 
     //basic mode
-    const mandatoryFields = ['Name', 'Address', 'Category'];
+    const mandatoryFields = ['Name', 'Address', 'Category', 'Tags'];
     const optionalFields = ['Phone', 'Website', 'Instagram', 'Dimensions'];
 
     mandatoryFields.forEach(field => {
@@ -953,13 +1090,14 @@ function populateEditFields() {
         document.getElementById('label-hr').classList.remove('hidden');
         const sizeStr = reverseLabelFontSize(props.LabelSize);
         document.getElementById('basic-LabelSize').value = sizeStr;
+        document.getElementById('basic-labelDir').value = props.labelDir || 'center';
+        document.getElementById('basic-labelBackground').value = (props.labelBackground) ? 'enabled' : 'disabled';
+
 
         if (sizeStr === 'none') {
             labelControls.classList.add('hidden');
         } else {
             labelControls.classList.remove('hidden');
-            document.getElementById('basic-labelDir').value = props.labelDir || 'center';
-            document.getElementById('basic-labelBackground').value = (props.labelBackground) ? 'enabled' : 'disabled';
         }
     } else {
         document.getElementById('basic-LabelSize-group').classList.add('hidden');
@@ -1045,7 +1183,7 @@ document.getElementById('save-edit-btn').addEventListener('click', () => {
         });
     } else {
         //basic mode
-        const allBasicInputs = ['Name', 'Address', 'Category', 'Phone', 'Website', 'Instagram', 'Dimensions'];
+        const allBasicInputs = ['Name', 'Address', 'Category', 'Tags', 'Phone', 'Website', 'Instagram', 'Dimensions'];
         allBasicInputs.forEach(field => {
             const val = document.getElementById(`basic-${field}`).value.trim();
             props[field] = (val !== '') ? val : null;
@@ -1267,6 +1405,7 @@ function toggleExtendMode(enable) {
         setTimeout(() => map.on('click', onExtendRectClick), 10);
     } else {
         isExtendModeActive = false;
+        map.pm.Toolbar.toggleButton('extendMode', false);
         cleanupExtendRectMode();
     }
 }
@@ -1813,7 +1952,8 @@ function onStackRectClick(e) {
             layer: finalPoly,
             angleDegrees: (line_angle_deg + mapAngle),
             width: widthFt,
-            height: heightFt
+            height: heightFt,
+            multi: true
         });
     }
 
@@ -2299,6 +2439,7 @@ map.on('pm:create', (e) => {
     const shapeType = e.shape;
 
     const currentActiveLayer = mapLayers.find(l => (l.id === selectedLayerID));
+    const closestName = findClosestBusinessName(layer);
 
     //check if geoman rect
     const isCustomRect = Boolean(e.width);
@@ -2308,6 +2449,7 @@ map.on('pm:create', (e) => {
         newLatLngs = layer.getLatLngs().flat(Infinity);
         e.width = metersToFeet(map.distance(newLatLngs[0], newLatLngs[1])).toFixed(1);
         e.height = metersToFeet(map.distance(newLatLngs[1], newLatLngs[2])).toFixed(1);
+        e.autoLabel = closestName;
     }
 
     if (currentActiveLayer) {
@@ -2327,7 +2469,6 @@ map.on('pm:create', (e) => {
         map.addLayer(layer);
     }
 
-    const closestName = findClosestBusinessName(layer);
 
     layer.feature = {
         type: 'Feature',
@@ -2373,8 +2514,13 @@ map.on('pm:create', (e) => {
     //     layer.bindTooltip(layer.feature.properties.Name, {direction: 'top'});
     // }
     bindShapeEvents(layer, layer.feature);
-    //layer.setStyle({fillOpacity: selectedOpacity});
-    openInfoPanel(layer.feature.properties, layer);
+
+    if (!e.multi) {
+        if (layer.setStyle) {
+            layer.setStyle({fillOpacity: selectedOpacity});
+        }
+        openInfoPanel(layer.feature.properties, layer);
+    }
 });
 
 
@@ -2415,8 +2561,56 @@ window.addEventListener('keydown', function(event) {
 
 
 
-////// filtering stuff!!
+//url stuff that im very excited for
+const queryString = window.location.search;
+const urlParams = new URLSearchParams(queryString);
+
+const filterParam = urlParams.get('filter')?.trim().toLowerCase();
+
+let paramFilterFunc = null;
+
+if (filterParam) {
+    paramFilterFunc = function(layer) {
+        const properties = layer.feature?.properties;
+        if (!properties) {return false;}
+
+        const tags = String(properties.Tags || '').toLowerCase();
+        return tags.includes(filterParam);
+    }
+    const matchingFeatures = filterToPredicate(paramFilterFunc);
+    map.fitBounds(L.featureGroup(matchingFeatures).getBounds());
+}
+
+const sharedPolygonName = urlParams.get('share')?.trim().toLowerCase();
+if (sharedPolygonName) {
+    let sharedPolygon = null;
+    
+    mapLayers.forEach((mapLayer) => {
+        mapLayer.featureGroup.eachLayer((layer) => {
+            if (layer.feature?.properties?.Name?.trim().toLowerCase() === sharedPolygonName) {
+                sharedPolygon = layer;
+            }
+        });
+    });
+
+    if (sharedPolygon) {
+        map.setView(sharedPolygon.getCenter(), 8, {animate: false});
+        openInfoPanel(sharedPolygon.feature.properties, sharedPolygon);
+        //half the width of the right side bar
+        map.panBy([150, 0], {animate: false});
+
+        if (sharedPolygon.setStyle) {
+            sharedPolygon.setStyle({fillOpacity: selectedOpacity});
+        } 
+    }
+
+}
+
+
+
+//filtering stuff!!
 function filterToPredicate(predicate) {
+    let matchingFeatures = [];
     mapLayers.forEach((mapLayer) => {
         if (mapLayer.stripes) {
             mapLayer.stripes.remove();
@@ -2446,6 +2640,7 @@ function filterToPredicate(predicate) {
                 if (layer.labelMarker) {
                     layer.labelMarker.getElement().style.opacity = 1;
                 }
+                matchingFeatures.push(layer);
             } else {
                 if (layer._path) {
                     layer._path.classList.remove('highlight');
@@ -2460,6 +2655,7 @@ function filterToPredicate(predicate) {
             }
         });
     });
+    return matchingFeatures;
 }
 
 function clearAllFilters() {
@@ -2484,7 +2680,7 @@ const searchInput = document.getElementById('search');
 searchInput.addEventListener('input', () => {
     const query = searchInput.value.trim().toLowerCase();
 
-    if (!query) {
+    if (!query && !paramFilterFunc) {
         clearAllFilters();
         return;
     }
@@ -2496,15 +2692,22 @@ searchInput.addEventListener('input', () => {
         const name = String(properties.Name || '').toLowerCase();
         const address = String(properties.Address || '').toLowerCase();
         const category = String(properties.Category || '').toLowerCase();
+        const tags = String(properties.Tags || '').toLowerCase();
         const label = String(properties.Label || '').toLowerCase().replaceAll("\\n", " ");
-
-        return name.includes(query) || address.includes(query) || category.includes(query) || label.includes(query);
+        
+        const matches = name.includes(query) || address.includes(query) || category.includes(query) || tags.includes(query) || label.includes(query);
+        if (paramFilterFunc) {
+            return matches && paramFilterFunc(layer);
+        } else {
+            return matches
+        }
+            
     })
 });
 
 //cool
-window.addEventListener('beforeunload', (event) => {
-    event.preventDefault();
-    console.log("halted");
-    event.returnValue = true; 
-});
+// window.addEventListener('beforeunload', (event) => {
+//     event.preventDefault();
+//     console.log("halted");
+//     event.returnValue = true; 
+// });

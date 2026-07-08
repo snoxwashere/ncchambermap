@@ -119,8 +119,8 @@
                         </button>
                         <div id="add-layer-dropdown" class="layer-dropdown hidden">
                             <div class="dropdown-item" id="opt-new-layer">Create New Layer</div>
-                            <div class="dropdown-item" id="opt-import-business">Import Business GeoJSON</div>
-                            <div class="dropdown-item" id="opt-import-drawing">Import Drawing GeoJSON</div>
+                            <div class="dropdown-item" id="opt-import-drawing">Import Custom Layer</div>
+                            <div class="dropdown-item" id="opt-import-business">Replace Business Layer</div>
                         </div>
                         <input type="file" id="file-import-business" accept=".geojson,.json" class="hidden">
                         <input type="file" id="file-import-drawing" accept=".geojson,.json" class="hidden">
@@ -147,13 +147,21 @@
             </div>
 
             <!-- slide out info panel -->
+            <!-- damn css transform means i have to do this -->
+             <div class="layer-dropdown hidden" id="panel-modify-dropdown">
+                <div class="dropdown-item" id="panel-share">Copy Sharing Link</div>
+                <div class="dropdown-item" id="panel-move">Move To Active Layer</div>
+                <div class="dropdown-item" id="panel-promote">Promote To Business Layer</div>
+                <div class="dropdown-item" id="panel-delete">Delete Feature</div>
+            </div>
             <aside id="info-panel">
                 <div id="info-view-mode">
                     <div class="panel-header">
                         <div class="panel-header-top">
                             <span class="category-badge">category</span>
                             <div class="panel-buttons">
-                                <button id="modify"><div class="button-icon">&hellip;</div></button>
+                                <button id="panel-modify"><div class="button-icon">&hellip;</div></button>
+                                
                                 <button id="close" onclick="closeInfoPanel()"><div class="button-icon">&#x2715;</div></button>
                             </div>
 
@@ -180,6 +188,7 @@
                             <div class="form-group"><label>Name</label><input type="text" id="basic-Name" data-key="Name"></div>
                             <div class="form-group"><label>Address</label><input type="text" id="basic-Address" data-key="Address"></div>
                             <div class="form-group"><label>Category</label><input type="text" id="basic-Category" data-key="Category"></div>
+                            <div class="form-group"><label>Tags</label><input type="text" id="basic-Tags" data-key="Tags"></div>
 
                             <div class="form-group optional-field hidden" id="basic-Phone-group"><label>Phone</label><input type="text" id="basic-Phone" data-key="Phone"></div>
                             <div class="form-group optional-field hidden" id="basic-Website-group"><label>Website</label><input type="text" id="basic-Website" data-key="Website"></div>

@@ -2705,9 +2705,20 @@ searchInput.addEventListener('input', () => {
     })
 });
 
+let inViewingMode = false;
+function toggleViewMode() {
+    inViewingMode = !inViewingMode;
+    if (inViewingMode) {
+        document.documentElement.style.removeProperty('--edit-mode');
+    } else {
+        document.documentElement.style.setProperty('--edit-mode', 'blue');
+    }
+}
+
 //cool
-// window.addEventListener('beforeunload', (event) => {
-//     event.preventDefault();
-//     console.log("halted");
-//     event.returnValue = true; 
-// });
+window.addEventListener('beforeunload', (event) => {
+    if (inViewingMode) {return;}
+    event.preventDefault();
+    console.log("halted");
+    event.returnValue = true; 
+});

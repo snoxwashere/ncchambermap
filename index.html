@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="en">
+<html lang="en" style="--edit-mode: blue">
 <head>
     <meta charset="UTF-8">
     <title>Test</title>
@@ -24,7 +24,8 @@
                     <h3>Chamber of Commerce</h3>
                 </div>
             </div>
-            <div>
+            <div style="display: flex; flex-direction: row; gap: 8px;">
+                <button id="toggle-view" onclick="toggleViewMode();">Toggle Viewing Mode</button>
                 <div id="search-box">
                     <input type="text" placeholder="Search.." id="search">
                     <div id="search-button" class="search-icon">

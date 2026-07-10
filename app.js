@@ -767,8 +767,11 @@ function openInfoPanel(properties, layer) {
         const instaURL = `https://www.instagram.com/${properties['Instagram'].replace(/^@/, '')}`;;
         createInfoPanelField('Instagram', properties['Instagram'], instaURL);
     }
-    if ('Dimensions' in properties && properties['Dimensions']) {
+    if ('Dimensions' in properties && properties['Dimensions'] && !inViewingMode) {
         createInfoPanelField('Dimensions', properties['Dimensions']);
+    }
+    if ('Tags' in properties && properties['Tags'] && !inViewingMode) {
+        createInfoPanelField('Tags', properties['Tags']);
     }
 
     //notes section
@@ -939,6 +942,7 @@ const svgLookup = {
     'Website' : '<circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>',
     'Instagram': '<rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>',
     'Dimensions': '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+    'Tags': '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>',
     'default' : '<circle cx="12" cy="12" r="10"></circle>'
 };
 function createInfoPanelField(key, value, href = null) {

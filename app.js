@@ -1,4 +1,25 @@
-//tighe uses weird coordinate reference system
+//first and foremost
+let inViewingMode = false;
+function toggleViewMode() {
+    inViewingMode = !inViewingMode;
+    if (inViewingMode) {
+        document.documentElement.style.removeProperty('--edit-mode');
+    } else {
+        document.documentElement.style.setProperty('--edit-mode', 'blue');
+    }
+    map.invalidateSize();
+}
+
+//cool
+window.addEventListener('beforeunload', (event) => {
+    if (inViewingMode) {return;}
+    event.preventDefault();
+    console.log("halted");
+    event.returnValue = true; 
+});
+
+
+//tighe map uses weird coordinate reference system
 //probably just dont touch this
 var customCRS = new L.Proj.CRS('EPSG:3857',
     '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs',
@@ -33,11 +54,8 @@ var map = L.map('map', {
     crs: customCRS,
     minZoom: 6,
     maxZoom: 10,
-    // maxBounds: [
-    //     [41.15865422796046, -73.52978700130929], 
-    //     [41.159501876187804, -73.53413260380269]
-    // ],
     autoPanPadding: [0, 0],
+    maxBoundsViscosity: 0.2
 });
 
 
@@ -47,6 +65,11 @@ L.tileLayer('https://hostingdata3.tighebond.com/arcgis/rest/services/NewCanaanCT
 }).addTo(map);
 
 map.setView([41.14688986667741, -73.49382549386547], 7);
+
+map.setMaxBounds(L.latLngBounds([
+    [41.13218765521723, -73.51087830464051], 
+    [41.16233264928831, -73.47623024708753]
+]));
 
 //layer controls
 let mapLayers = [];
@@ -585,6 +608,12 @@ function bindShapeEvents(layer, feature) {
         if (!enableLayerClick || map.pm.globalDrawModeEnabled() || map.pm.globalRemovalModeEnabled() || map.pm.globalEditModeEnabled() || map.pm.globalDragModeEnabled()) {
             return; //do nothing
         }
+        //remember me
+        if (inViewingMode) {
+            if (String(feature.properties.Tags || '').toLowerCase().includes('noclick')) {
+                return;
+            }
+        }
         L.DomEvent.stopPropagation(e);
         openInfoPanel(feature.properties, layer); //defined later
     });
@@ -770,10 +799,13 @@ panelModifyBtn.addEventListener('click', (e) => {
 
         //setup fields
         document.getElementById('panel-promote').classList.remove('hidden');
+        document.getElementById('panel-move').classList.remove('hidden');
 
         const curLayer = mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(selectedPolygon));
         if (curLayer.featureGroup === businessGroup) {
             document.getElementById('panel-promote').classList.add('hidden');
+        } else if (curLayer.id === selectedLayerID) {
+            document.getElementById('panel-move').classList.add('hidden');
         }
     }
 });
@@ -800,6 +832,30 @@ document.getElementById('panel-share').addEventListener('click', (e) => {
         notesTimeout = setTimeout(() => {
             dropdownBtn.textContent = "Copy Sharing Link";;
         }, 1500);
+    }
+});
+
+document.getElementById('panel-maps').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!selectedPolygon) {
+        return;
+    }
+    
+    const mapsName = selectedPolygon.feature?.properties?.Name;
+    const mapsLocation = getLayerCenter(selectedPolygon);
+    if (mapsName && mapsLocation) {
+        const curLayer = mapLayers.find(mapLayer => mapLayer.featureGroup.hasLayer(selectedPolygon));
+        const outputURL = new URL('https://www.google.com/maps/search/');
+        outputURL.searchParams.append('api', '1');
+        if (curLayer.featureGroup === businessGroup) {
+            outputURL.searchParams.append('query', `${mapsName} New Canaan`);
+            outputURL.searchParams.append('center', `${mapsLocation.lat},${mapsLocation.lng}`);
+        } else {
+            outputURL.searchParams.append('query', `${mapsLocation.lat},${mapsLocation.lng}`);
+            window.open(outputURL.toString(), "_blank");
+        }
+        window.open(outputURL.toString(), "_blank");
+
     }
 });
 
@@ -2703,22 +2759,4 @@ searchInput.addEventListener('input', () => {
         }
             
     })
-});
-
-let inViewingMode = false;
-function toggleViewMode() {
-    inViewingMode = !inViewingMode;
-    if (inViewingMode) {
-        document.documentElement.style.removeProperty('--edit-mode');
-    } else {
-        document.documentElement.style.setProperty('--edit-mode', 'blue');
-    }
-}
-
-//cool
-window.addEventListener('beforeunload', (event) => {
-    if (inViewingMode) {return;}
-    event.preventDefault();
-    console.log("halted");
-    event.returnValue = true; 
 });
